@@ -1,0 +1,46 @@
+name: Security
+
+# CodeQL is intentionally absent: it has no Dart/Flutter analyzer. Static analysis
+# for this project comes from `flutter analyze --fatal-infos` in CI, dependency
+# advisories come from Dependabot's `pub` ecosystem (see dependabot.yml), and the
+# build-time implant surface is covered by the vendored scan below.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  supply-chain-scan:
+    name: Supply-chain Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # The scanner is vendored in this repo on purpose. Fetching a scanner over
+      # the network at scan time would reintroduce the exact class of dependency
+      # this check exists to catch.
+      - name: Run supply-chain scan
+        run: bash tool/supply_chain_scan.sh "${{ github.workspace }}"
